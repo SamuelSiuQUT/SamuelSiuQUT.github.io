@@ -1,0 +1,2309 @@
+---
+title: "N11423579 SIU Wing Hei Final Report"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+```{r}
+train <- read.csv("C:/Users/siusa/Desktop/QUT課程/Y2S2/MXN442_24se2 Modern Statistical Computing Techniques/Assignment 3 Final Report/Rstudio/Open Titanic data/train.csv")
+```
+
+```{r}
+test <- read.csv("C:/Users/siusa/Desktop/QUT課程/Y2S2/MXN442_24se2 Modern Statistical Computing Techniques/Assignment 3 Final Report/Rstudio/Open Titanic data/test.csv")
+```
+
+```{r}
+test$Name[415] <- "Oliva y Ocana, Miss. Fermina"# becuase Oliva y Ocana, Dona. Fermina do not have Nickname
+```
+
+
+```{r}
+gender_submission <- read.csv("C:/Users/siusa/Desktop/QUT課程/Y2S2/MXN442_24se2 Modern Statistical Computing Techniques/Assignment 3 Final Report/Rstudio/Open Titanic data/gender_submission.csv")
+```
+
+# Data processing
+
+```{r}
+colnames(train)
+```
+
+```{r}
+str(train)
+```
+
+```{r}
+str(test)
+```
+
+```{r}
+str(gender_submission)
+```
+
+```{r}
+changedtpye_train<-data.frame(PassengerId = train$PassengerId,
+                       Survived = as.factor(train$Survived),
+                       Pclass = as.factor(train$Pclass),
+                       Name = train$Name,
+                       Sex = as.factor(train$Sex),
+                       Age = train$Age,
+                       SibSp = train$SibSp,
+                       Parch = train$Parch,
+                       Ticket = train$Ticket,
+                       Fare = train$Fare,
+                       Cabin = train$Cabin,
+                       Embarked = train$Embarked
+                       )
+
+str(changedtpye_train)
+```
+
+```{r}
+changedtpye_test<-data.frame(PassengerId = test$PassengerId,
+                       Pclass = as.factor(test$Pclass),
+                       Name = test$Name,
+                       Sex = as.factor(test$Sex),
+                       Age = test$Age,
+                       SibSp = test$SibSp,
+                       Parch = test$Parch,
+                       Ticket = test$Ticket,
+                       Fare = test$Fare,
+                       Cabin = test$Cabin,
+                       Embarked = test$Embarked
+                       )
+
+str(changedtpye_test)
+```
+
+```{r}
+changedtpye_gender_submission<-data.frame(PassengerId = gender_submission$PassengerId,
+                       Survived = as.factor(gender_submission$Survived)
+                       )
+
+str(changedtpye_gender_submission)
+```
+
+```{r}
+process_train <- subset(changedtpye_train, select = -PassengerId)
+
+# change age to mean
+train_meanofAge <- mean(process_train$Age, na.rm = TRUE)
+process_train$Age[is.na(process_train$Age)] <- train_meanofAge
+
+
+process_train <- subset(process_train, select = -Ticket)
+
+process_train <- subset(process_train, select = -Fare)
+
+process_train <- subset(process_train, select = -Cabin)
+
+process_train <- subset(process_train, select = -Embarked)
+
+process_train$Nickname <- sub(".*,\\s*(\\w+)\\..*", "\\1", process_train$Name)
+process_train$Nickname <- as.factor(process_train$Nickname)
+
+process_train <- subset(process_train, select = -Name)#must do this after already change Nickname
+
+
+process_train
+```
+
+```{r}
+process_test <- subset(changedtpye_test, select = -PassengerId)
+
+# change age to mean
+test_meanofAge <- mean(process_test$Age, na.rm = TRUE)
+process_test$Age[is.na(process_test$Age)] <- test_meanofAge
+
+
+process_test <- subset(process_test, select = -Ticket)
+
+process_test <- subset(process_test, select = -Fare)
+
+process_test <- subset(process_test, select = -Cabin)
+
+process_test <- subset(process_test, select = -Embarked)
+
+process_test$Nickname <- sub(".*,\\s*(\\w+)\\..*", "\\1", process_test$Name)
+process_test$Nickname <- as.factor(process_test$Nickname)
+#process_test$Nickname[415] <- "Miss" # becuase Oliva y Ocana, Dona. Fermina do not have Nickname
+
+process_test <- subset(process_test, select = -Name)#must do this after already change Nickname
+
+
+process_test
+```
+
+
+
+
+```{r}
+library(caret)
+library(e1071)
+library(randomForest)
+library(class)
+```
+
+
+```{r}
+sum(is.na(process_train))
+```
+
+```{r}
+sum(is.na(process_test))
+```
+
+```{r}
+sum(is.na(changedtpye_gender_submission))
+
+```
+
+# Article Model
+
+
+
+# Logistic
+## Logistic with out cross-validation
+
+```{r}
+
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+set.seed(1)
+logisticwithoutcross <- glm(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, # + Nickname
+                      data = process_train, 
+                      family = binomial)
+
+
+summary(logisticwithoutcross)
+
+
+#pred_logisticwithoutcross <- predict(logisticwithoutcross, newdata = process_test, type = "response")
+pred_logisticwithoutcross <- predict(logisticwithoutcross, newdata = process_test)
+
+
+pred_value_logisticwithoutcross <- ifelse(pred_logisticwithoutcross > 0.5, 1, 0)#, type = "response"
+#pred_value_logisticwithoutcross <- pred_logisticwithoutcross
+
+
+conmatrix_logisticwithoutcross <- table(pred_value_logisticwithoutcross, changedtpye_gender_submission$Survived)
+print(conmatrix_logisticwithoutcross)
+
+```
+
+```{r}
+TP_logisticwithoutcross <- sum(pred_value_logisticwithoutcross == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_logisticwithoutcross <- sum(pred_value_logisticwithoutcross == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_logisticwithoutcross <- sum(pred_value_logisticwithoutcross == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_logisticwithoutcross <- sum(pred_value_logisticwithoutcross == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic Logistic (TP):", TP_logisticwithoutcross, "\n")
+cat("True Negatives in Titanic Logistic (TN):", TN_logisticwithoutcross, "\n")
+cat("False Positives in Titanic Logistic (FP):", FP_logisticwithoutcross, "\n")
+cat("False Negatives in Titanic Logistic (FN):", FN_logisticwithoutcross, "\n")
+
+```
+
+```{r}
+table(pred_value_logisticwithoutcross, changedtpye_gender_submission$Survived)
+
+
+acc_logisticwithoutcross <- (TP_logisticwithoutcross + TN_logisticwithoutcross) / (TP_logisticwithoutcross + TN_logisticwithoutcross + FP_logisticwithoutcross + FN_logisticwithoutcross)
+
+precision_logisticwithoutcross <- (TP_logisticwithoutcross) / (TP_logisticwithoutcross + FP_logisticwithoutcross)
+
+reca_logisticwithoutcross <- (TP_logisticwithoutcross) / (TP_logisticwithoutcross + FN_logisticwithoutcross)
+
+f1_logisticwithoutcross <- 2 * ((precision_logisticwithoutcross * reca_logisticwithoutcross) / (precision_logisticwithoutcross + reca_logisticwithoutcross))
+
+cat("Accuracy of Titanic Logistic:", acc_logisticwithoutcross, "\n")
+cat("Precision of Titanic Logistic:", precision_logisticwithoutcross, "\n")
+cat("Recall of Titanic Logistic:", reca_logisticwithoutcross, "\n")
+cat("F1-Score of Titanic Logistic:", f1_logisticwithoutcross, "\n")
+
+```
+
+## Logistic with k-fold cross-validation
+### Logistic with k-fold cross-validation (k=10)
+
+```{r}
+
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+set.seed(1)
+k10 <- trainControl(method = "cv", number = 10)
+
+logistick10 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                           data = process_train, 
+                           method = "glm", 
+                           family = binomial, 
+                           trControl = k10)
+
+print(logistick10)
+
+summary(logistick10)
+
+
+pred_logistick10 <- predict(logistick10, newdata = process_test)#, type = "response"
+
+
+#pred_value_logistick10 <- ifelse(pred_logistick10 > 0.5, 1, 0)#, type = "response"
+pred_value_logistick10 <- pred_logistick10
+
+
+conmatrix_logistick10 <- table(pred_value_logistick10, changedtpye_gender_submission$Survived)
+print(conmatrix_logistick10)
+
+```
+
+```{r}
+TP_logistick10 <- sum(pred_value_logistick10 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_logistick10 <- sum(pred_value_logistick10 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_logistick10 <- sum(pred_value_logistick10 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_logistick10 <- sum(pred_value_logistick10 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic Logistic (TP):", TP_logistick10, "\n")
+cat("True Negatives in Titanic Logistic (TN):", TN_logistick10, "\n")
+cat("False Positives in Titanic Logistic (FP):", FP_logistick10, "\n")
+cat("False Negatives in Titanic Logistic (FN):", FN_logistick10, "\n")
+```
+
+```{r}
+table(pred_value_logistick10, changedtpye_gender_submission$Survived)
+
+
+acc_logistick10 <- (TP_logistick10 + TN_logistick10) / (TP_logistick10 + TN_logistick10 + FP_logistick10 + FN_logistick10)
+
+precision_logistick10 <- (TP_logistick10) / (TP_logistick10 + FP_logistick10)
+
+reca_logistick10 <- (TP_logistick10) / (TP_logistick10 + FN_logistick10)
+
+f1_logistick10 <- 2 * ((precision_logistick10 * reca_logistick10) / (precision_logistick10 + reca_logistick10))
+
+cat("Accuracy of Titanic Logistic:", acc_logistick10, "\n")
+cat("Precision of Titanic Logistic:", precision_logistick10, "\n")
+cat("Recall of Titanic Logistic:", reca_logistick10, "\n")
+cat("F1-Score of Titanic Logistic:", f1_logistick10, "\n")
+
+```
+
+### Logistic with k-fold cross-validation (k=5)
+
+```{r}
+
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+set.seed(1)
+k5 <- trainControl(method = "cv", number = 5)
+
+logistick5 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                           data = process_train, 
+                           method = "glm", 
+                           family = binomial, 
+                           trControl = k5)
+
+print(logistick5)
+
+summary(logistick5)
+
+
+pred_logistick5 <- predict(logistick5, newdata = process_test)#, type = "response"
+
+
+#pred_value_logistick5 <- ifelse(pred_logistick5 > 0.5, 1, 0)#, type = "response"
+pred_value_logistick5 <- pred_logistick5
+
+
+conmatrix_logistick5 <- table(pred_value_logistick5, changedtpye_gender_submission$Survived)
+print(conmatrix_logistick5)
+
+```
+
+```{r}
+TP_logistick5 <- sum(pred_value_logistick5 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_logistick5 <- sum(pred_value_logistick5 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_logistick5 <- sum(pred_value_logistick5 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_logistick5 <- sum(pred_value_logistick5 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic Logistic (TP):", TP_logistick5, "\n")
+cat("True Negatives in Titanic Logistic (TN):", TN_logistick5, "\n")
+cat("False Positives in Titanic Logistic (FP):", FP_logistick5, "\n")
+cat("False Negatives in Titanic Logistic (FN):", FN_logistick5, "\n")
+
+```
+
+```{r}
+table(pred_value_logistick5, changedtpye_gender_submission$Survived)
+
+
+acc_logistick5 <- (TP_logistick5 + TN_logistick5) / (TP_logistick5 + TN_logistick5 + FP_logistick5 + FN_logistick5)
+
+precision_logistick5 <- (TP_logistick5) / (TP_logistick5 + FP_logistick5)
+
+reca_logistick5 <- (TP_logistick5) / (TP_logistick5 + FN_logistick5)
+
+f1_logistick5 <- 2 * ((precision_logistick5 * reca_logistick5) / (precision_logistick5 + reca_logistick5))
+
+cat("Accuracy of Titanic Logistic:", acc_logistick5, "\n")
+cat("Precision of Titanic Logistic:", precision_logistick5, "\n")
+cat("Recall of Titanic Logistic:", reca_logistick5, "\n")
+cat("F1-Score of Titanic Logistic:", f1_logistick5, "\n")
+
+```
+
+### Logistic with k-fold cross-validation (k=4)
+
+```{r}
+
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+set.seed(1)
+k4 <- trainControl(method = "cv", number = 4)
+
+logistick4 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                           data = process_train, 
+                           method = "glm", 
+                           family = binomial, 
+                           trControl = k4)
+
+print(logistick4)
+
+summary(logistick4)
+
+
+pred_logistick4 <- predict(logistick4, newdata = process_test)#, type = "response"
+
+
+#pred_value_logistick4 <- ifelse(pred_logistick4 > 0.5, 1, 0)#, type = "response"
+pred_value_logistick4 <- pred_logistick4
+
+
+conmatrix_logistick4 <- table(pred_value_logistick4, changedtpye_gender_submission$Survived)
+print(conmatrix_logistick4)
+
+```
+
+```{r}
+TP_logistick4 <- sum(pred_value_logistick4 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_logistick4 <- sum(pred_value_logistick4 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_logistick4 <- sum(pred_value_logistick4 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_logistick4 <- sum(pred_value_logistick4 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic Logistic (TP):", TP_logistick4, "\n")
+cat("True Negatives in Titanic Logistic (TN):", TN_logistick4, "\n")
+cat("False Positives in Titanic Logistic (FP):", FP_logistick4, "\n")
+cat("False Negatives in Titanic Logistic (FN):", FN_logistick4, "\n")
+
+```
+
+```{r}
+table(pred_value_logistick4, changedtpye_gender_submission$Survived)
+
+
+acc_logistick4 <- (TP_logistick4 + TN_logistick4) / (TP_logistick4 + TN_logistick4 + FP_logistick4 + FN_logistick4)
+
+precision_logistick4 <- (TP_logistick4) / (TP_logistick4 + FP_logistick4)
+
+reca_logistick4 <- (TP_logistick4) / (TP_logistick4 + FN_logistick4)
+
+f1_logistick4 <- 2 * ((precision_logistick4 * reca_logistick4) / (precision_logistick4 + reca_logistick4))
+
+cat("Accuracy of Titanic Logistic:", acc_logistick4, "\n")
+cat("Precision of Titanic Logistic:", precision_logistick4, "\n")
+cat("Recall of Titanic Logistic:", reca_logistick4, "\n")
+cat("F1-Score of Titanic Logistic:", f1_logistick4, "\n")
+
+```
+
+## Result is the same, one of the reason is data set is to small.
+
+
+
+# K nearest neighbors(KNN)
+## KNN with out cross-validation
+
+```{r}
+library(class)    
+library(caret)
+#install.packages("kknn")
+library(kknn)
+```
+
+```{r}
+
+library(kknn)  
+
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+
+
+set.seed(1)  
+KNNwithoutcross <- kknn(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, train = process_train, test = process_test, k = 10)
+
+
+pre_KNNwithoutcross <- predict(KNNwithoutcross, newdata = process_test)
+
+
+conmatrix_KNNwithoutcross <- table(pre_KNNwithoutcross , changedtpye_gender_submission$Survived)
+
+
+print(conmatrix_KNNwithoutcross)
+```
+
+```{r}
+TP_KNNwithoutcross <- sum(pre_KNNwithoutcross == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_KNNwithoutcross <- sum(pre_KNNwithoutcross == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_KNNwithoutcross <- sum(pre_KNNwithoutcross == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_KNNwithoutcross <- sum(pre_KNNwithoutcross == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic KNN:", TP_KNNwithoutcross, "\n")
+cat("True Negatives in Titanic KNN:", TN_KNNwithoutcross, "\n")
+cat("False Positives in Titanic KNN:", FP_KNNwithoutcross, "\n")
+cat("False Negatives in Titanic KNN:", FN_KNNwithoutcross, "\n")
+
+```
+
+```{r}
+table(pre_KNNwithoutcross, changedtpye_gender_submission$Survived)
+
+
+acc_KNNwithoutcross <- (TP_KNNwithoutcross + TN_KNNwithoutcross) / (TP_KNNwithoutcross + TN_KNNwithoutcross + FP_KNNwithoutcross + FN_KNNwithoutcross)
+
+precision_KNNwithoutcross <- (TP_KNNwithoutcross) / (TP_KNNwithoutcross + FP_KNNwithoutcross)
+
+reca_KNNwithoutcross <- (TP_KNNwithoutcross) / (TP_KNNwithoutcross + FN_KNNwithoutcross)
+
+f1_KNNwithoutcross <- 2 * ((precision_KNNwithoutcross * reca_KNNwithoutcross) / (precision_KNNwithoutcross + reca_KNNwithoutcross))
+
+cat("Accuracy of Titanic KNN:", acc_KNNwithoutcross, "\n")
+cat("Precision of Titanic KNN:", precision_KNNwithoutcross, "\n")
+cat("Recall of Titanic KNN:", reca_KNNwithoutcross, "\n")
+cat("F1-Score of Titanic KNN:", f1_KNNwithoutcross, "\n")
+```
+### when k is bigger in this case, performance is better, I have try 3,5,10,15, 
+
+
+
+## KNN with k-fold cross-validation (k=10)
+```{r}
+library(kknn)  
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+set.seed(1)  
+k10 <- trainControl(method = "cv", number = 10)
+
+KNNk10 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                         data = process_train, 
+                         method = "kknn", 
+                         trControl = k10,
+                         tuneLength = 10) #range of 10 different potential k-values to find the optimal one
+print(KNNk10)
+
+
+pre_KNNk10 <- predict(KNNk10, newdata = process_test)
+
+
+conmatrix_KNNk10 <- table(pre_KNNk10, changedtpye_gender_submission$Survived)
+
+
+print(conmatrix_KNNk10)
+```
+
+```{r}
+TP_KNNk10 <- sum(pre_KNNk10 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_KNNk10 <- sum(pre_KNNk10 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_KNNk10 <- sum(pre_KNNk10 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_KNNk10 <- sum(pre_KNNk10 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic KNN:", TP_KNNk10, "\n")
+cat("True Negatives in Titanic KNN:", TN_KNNk10, "\n")
+cat("False Positives in Titanic KNN:", FP_KNNk10, "\n")
+cat("False Negatives in Titanic KNN:", FN_KNNk10, "\n")
+
+```
+
+```{r}
+table(pre_KNNk10, changedtpye_gender_submission$Survived)
+
+
+acc_KNNk10 <- (TP_KNNk10 + TN_KNNk10) / (TP_KNNk10 + TN_KNNk10 + FP_KNNk10 + FN_KNNk10)
+
+precision_KNNk10 <- (TP_KNNk10) / (TP_KNNk10 + FP_KNNk10)
+
+reca_KNNk10 <- (TP_KNNk10) / (TP_KNNk10 + FN_KNNk10)
+
+f1_KNNk10 <- 2 * ((precision_KNNk10 * reca_KNNk10) / (precision_KNNk10 + reca_KNNk10))
+
+cat("Accuracy of Titanic KNN:", acc_KNNk10, "\n")
+cat("Precision of Titanic KNN:", precision_KNNk10, "\n")
+cat("Recall of Titanic KNN:", reca_KNNk10, "\n")
+cat("F1-Score of Titanic KNN:", f1_KNNk10, "\n")
+```
+
+
+## KNN with k-fold cross-validation (k=5)
+```{r}
+library(kknn)  
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+set.seed(1)  
+k5 <- trainControl(method = "cv", number = 5)
+
+KNNk5 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                         data = process_train, 
+                         method = "kknn", 
+                         trControl = k5,
+                         tuneLength = 10) #range of 10 different potential k-values to find the optimal one
+print(KNNk5)
+
+
+pre_KNNk5 <- predict(KNNk5, newdata = process_test)
+
+
+conmatrix_KNNk5 <- table(pre_KNNk5, changedtpye_gender_submission$Survived)
+
+
+print(conmatrix_KNNk5)
+```
+
+```{r}
+TP_KNNk5 <- sum(pre_KNNk5 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_KNNk5 <- sum(pre_KNNk5 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_KNNk5 <- sum(pre_KNNk5 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_KNNk5 <- sum(pre_KNNk5 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic KNN:", TP_KNNk5, "\n")
+cat("True Negatives in Titanic KNN:", TN_KNNk5, "\n")
+cat("False Positives in Titanic KNN:", FP_KNNk5, "\n")
+cat("False Negatives in Titanic KNN:", FN_KNNk5, "\n")
+```
+
+```{r}
+table(pre_KNNk5, changedtpye_gender_submission$Survived)
+
+
+acc_KNNk5 <- (TP_KNNk5 + TN_KNNk5) / (TP_KNNk5 + TN_KNNk5 + FP_KNNk5 + FN_KNNk5)
+
+precision_KNNk5 <- (TP_KNNk5) / (TP_KNNk5 + FP_KNNk5)
+
+reca_KNNk5 <- (TP_KNNk5) / (TP_KNNk5 + FN_KNNk5)
+
+f1_KNNk5 <- 2 * ((precision_KNNk5 * reca_KNNk5) / (precision_KNNk5 + reca_KNNk5))
+
+cat("Accuracy of Titanic KNN:", acc_KNNk5, "\n")
+cat("Precision of Titanic KNN:", precision_KNNk5, "\n")
+cat("Recall of Titanic KNN:", reca_KNNk5, "\n")
+cat("F1-Score of Titanic KNN:", f1_KNNk5, "\n")
+```
+
+## KNN with k-fold cross-validation (k=4)
+```{r}
+library(kknn)  
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+set.seed(1)  
+k4 <- trainControl(method = "cv", number = 4)
+
+KNNk4 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                         data = process_train, 
+                         method = "kknn", 
+                         trControl = k4,
+                         tuneLength = 10) #range of 10 different potential k-values to find the optimal one
+print(KNNk4)
+
+
+pre_KNNk4 <- predict(KNNk4, newdata = process_test)
+
+
+conmatrix_KNNk4 <- table(pre_KNNk4, changedtpye_gender_submission$Survived)
+
+
+print(conmatrix_KNNk4)
+```
+
+```{r}
+TP_KNNk4 <- sum(pre_KNNk4 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_KNNk4 <- sum(pre_KNNk4 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_KNNk4 <- sum(pre_KNNk4 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_KNNk4 <- sum(pre_KNNk4 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic KNN:", TP_KNNk4, "\n")
+cat("True Negatives in Titanic KNN:", TN_KNNk4, "\n")
+cat("False Positives in Titanic KNN:", FP_KNNk4, "\n")
+cat("False Negatives in Titanic KNN:", FN_KNNk4, "\n")
+```
+
+```{r}
+table(pre_KNNk4, changedtpye_gender_submission$Survived)
+
+
+acc_KNNk4 <- (TP_KNNk4 + TN_KNNk4) / (TP_KNNk4 + TN_KNNk4 + FP_KNNk4 + FN_KNNk4)
+
+precision_KNNk4 <- (TP_KNNk4) / (TP_KNNk4 + FP_KNNk4)
+
+reca_KNNk4 <- (TP_KNNk4) / (TP_KNNk4 + FN_KNNk4)
+
+f1_KNNk4 <- 2 * ((precision_KNNk4 * reca_KNNk4) / (precision_KNNk4 + reca_KNNk4))
+
+cat("Accuracy of Titanic KNN:", acc_KNNk4, "\n")
+cat("Precision of Titanic KNN:", precision_KNNk4, "\n")
+cat("Recall of Titanic KNN:", reca_KNNk4, "\n")
+cat("F1-Score of Titanic KNN:", f1_KNNk4, "\n")
+```
+
+### not the same with Article(kfold higher performance higher), in here k=5 is higher, k=4 is the lower.
+
+
+
+# Support Vector Machine(SVM) - radial
+## SVM with out cross-validation - radial - Controls variance by squashing down most dimensions(in book)
+
+```{r}
+library(e1071)
+
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+
+set.seed(1)
+SVMwithoutcross <- svm(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                       data = process_train, 
+                       kernel = "radial")
+summary(SVMwithoutcross)
+
+pred_SVMwithoutcross <- predict(SVMwithoutcross, newdata = process_test)
+
+
+conmatrix_SVMwithoutcross <- table(pred_SVMwithoutcross, changedtpye_gender_submission$Survived)
+
+
+print(conmatrix_SVMwithoutcross)
+```
+
+```{r}
+TP_SVMwithoutcross <- sum(pred_SVMwithoutcross == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_SVMwithoutcross <- sum(pred_SVMwithoutcross == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_SVMwithoutcross <- sum(pred_SVMwithoutcross == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_SVMwithoutcross <- sum(pred_SVMwithoutcross == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic SVM:", TP_SVMwithoutcross, "\n")
+cat("True Negatives in Titanic SVM:", TN_SVMwithoutcross, "\n")
+cat("False Positives in Titanic SVM:", FP_SVMwithoutcross, "\n")
+cat("False Negatives in Titanic SVM:", FN_SVMwithoutcross, "\n")
+```
+
+```{r}
+table(pred_SVMwithoutcross, changedtpye_gender_submission$Survived)
+
+
+acc_SVMwithoutcross <- (TP_SVMwithoutcross + TN_SVMwithoutcross) / (TP_SVMwithoutcross + TN_SVMwithoutcross + FP_SVMwithoutcross + FN_SVMwithoutcross)
+
+precision_SVMwithoutcross <- (TP_SVMwithoutcross) / (TP_SVMwithoutcross + FP_SVMwithoutcross)
+
+reca_SVMwithoutcross <- (TP_SVMwithoutcross) / (TP_SVMwithoutcross + FN_SVMwithoutcross)
+
+f1_SVMwithoutcross <- 2 * ((precision_SVMwithoutcross * reca_SVMwithoutcross) / (precision_SVMwithoutcross + reca_SVMwithoutcross))
+
+cat("Accuracy of Titanic SVM:", acc_SVMwithoutcross, "\n")
+cat("Precision of Titanic SVM:", precision_SVMwithoutcross, "\n")
+cat("Recall of Titanic SVM:", reca_SVMwithoutcross, "\n")
+cat("F1-Score of Titanic SVM:", f1_SVMwithoutcross, "\n")
+```
+
+
+## SVM with k-fold cross-validation (k=10) - radial
+
+```{r}
+library(e1071)
+library(caret)
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+
+set.seed(1)
+k10 <- trainControl(method = "cv", number = 10)
+SVMk10 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                data = process_train, 
+                method = "svmRadial", 
+                trControl = k10,        
+                tuneLength = 10)        
+
+print(SVMk10)
+summary(SVMk10)
+
+pred_SVMk10 <- predict(SVMk10, newdata = process_test)
+
+conmatrix_SVMk10 <- table(pred_SVMk10, changedtpye_gender_submission$Survived)
+print(conmatrix_SVMk10)
+```
+
+```{r}
+TP_SVMk10 <- sum(pred_SVMk10 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_SVMk10 <- sum(pred_SVMk10 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_SVMk10 <- sum(pred_SVMk10 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_SVMk10 <- sum(pred_SVMk10 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic SVM:", TP_SVMk10, "\n")
+cat("True Negatives in Titanic SVM:", TN_SVMk10, "\n")
+cat("False Positives in Titanic SVM:", FP_SVMk10, "\n")
+cat("False Negatives in Titanic SVM:", FN_SVMk10, "\n")
+```
+
+```{r}
+table(pred_SVMk10, changedtpye_gender_submission$Survived)
+
+
+acc_SVMk10 <- (TP_SVMk10 + TN_SVMk10) / (TP_SVMk10 + TN_SVMk10 + FP_SVMk10 + FN_SVMk10)
+
+precision_SVMk10 <- (TP_SVMk10) / (TP_SVMk10 + FP_SVMk10)
+
+reca_SVMk10 <- (TP_SVMk10) / (TP_SVMk10 + FN_SVMk10)
+
+f1_SVMk10 <- 2 * ((precision_SVMk10 * reca_SVMk10) / (precision_SVMk10 + reca_SVMk10))
+
+cat("Accuracy of Titanic SVM:", acc_SVMk10, "\n")
+cat("Precision of Titanic SVM:", precision_SVMk10, "\n")
+cat("Recall of Titanic SVM:", reca_SVMk10, "\n")
+cat("F1-Score of Titanic SVM:", f1_SVMk10, "\n")
+```
+
+## SVM with k-fold cross-validation (k=5) - radial
+
+```{r}
+library(e1071)
+library(caret)
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+
+set.seed(1)
+k5 <- trainControl(method = "cv", number = 5)
+SVMk5 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                data = process_train, 
+                method = "svmRadial",   
+                trControl = k5,      
+                tuneLength = 10)     
+
+print(SVMk5)
+summary(SVMk5)
+
+pred_SVMk5 <- predict(SVMk5, newdata = process_test)
+
+conmatrix_SVMk5 <- table(pred_SVMk5, changedtpye_gender_submission$Survived)
+print(conmatrix_SVMk5)
+```
+
+```{r}
+TP_SVMk5 <- sum(pred_SVMk5 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_SVMk5 <- sum(pred_SVMk5 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_SVMk5 <- sum(pred_SVMk5 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_SVMk5 <- sum(pred_SVMk5 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic SVM:", TP_SVMk5, "\n")
+cat("True Negatives in Titanic SVM:", TN_SVMk5, "\n")
+cat("False Positives in Titanic SVM:", FP_SVMk5, "\n")
+cat("False Negatives in Titanic SVM:", FN_SVMk5, "\n")
+```
+
+```{r}
+table(pred_SVMk5, changedtpye_gender_submission$Survived)
+
+
+acc_SVMk5 <- (TP_SVMk5 + TN_SVMk5) / (TP_SVMk5 + TN_SVMk5 + FP_SVMk5 + FN_SVMk5)
+
+precision_SVMk5 <- (TP_SVMk5) / (TP_SVMk5 + FP_SVMk5)
+
+reca_SVMk5 <- (TP_SVMk5) / (TP_SVMk5 + FN_SVMk5)
+
+f1_SVMk5 <- 2 * ((precision_SVMk5 * reca_SVMk5) / (precision_SVMk5 + reca_SVMk5))
+
+cat("Accuracy of Titanic SVM", acc_SVMk5, "\n")
+cat("Precision of Titanic SVM:", precision_SVMk5, "\n")
+cat("Recall of Titanic SVM:", reca_SVMk5, "\n")
+cat("F1-Score of Titanic SVM:", f1_SVMk5, "\n")
+```
+
+## SVM with k-fold cross-validation (k=4) - radial
+
+```{r}
+library(e1071)
+library(caret)
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+
+set.seed(1)
+k4 <- trainControl(method = "cv", number = 4)
+SVMk4 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                data = process_train, 
+                method = "svmRadial",  
+                trControl = k4,        
+                tuneLength = 10)        
+
+print(SVMk4)
+summary(SVMk4)
+
+pred_SVMk4 <- predict(SVMk4, newdata = process_test)
+
+conmatrix_SVMk4 <- table(pred_SVMk4, changedtpye_gender_submission$Survived)
+print(conmatrix_SVMk4)
+```
+
+```{r}
+TP_SVMk4 <- sum(pred_SVMk4 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_SVMk4 <- sum(pred_SVMk4 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_SVMk4 <- sum(pred_SVMk4 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_SVMk4 <- sum(pred_SVMk4 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic SVM:", TP_SVMk4, "\n")
+cat("True Negatives in Titanic SVM:", TN_SVMk4, "\n")
+cat("False Positives in Titanic SVM:", FP_SVMk4, "\n")
+cat("False Negatives in Titanic SVM:", FN_SVMk4, "\n")
+```
+
+```{r}
+table(pred_SVMk4, changedtpye_gender_submission$Survived)
+
+
+acc_SVMk4 <- (TP_SVMk4 + TN_SVMk4) / (TP_SVMk4 + TN_SVMk4 + FP_SVMk4 + FN_SVMk4)
+
+precision_SVMk4 <- (TP_SVMk4) / (TP_SVMk4 + FP_SVMk4)
+
+reca_SVMk4 <- (TP_SVMk4) / (TP_SVMk4 + FN_SVMk4)
+
+f1_SVMk4 <- 2 * ((precision_SVMk4 * reca_SVMk4) / (precision_SVMk4 + reca_SVMk4))
+
+cat("Accuracy of Titanic SVM:", acc_SVMk4, "\n")
+cat("Precision of Titanic SVM:", precision_SVMk4, "\n")
+cat("Recall of Titanic SVM:", reca_SVMk4, "\n")
+cat("F1-Score of Titanic SVM:", f1_SVMk4, "\n")
+```
+
+# Support Vector Machine(SVM) - polynomial
+## SVM with out cross-validation - polynomial - Use kernels to introduce nonlinearities in a controlled manner(in book)
+
+```{r}
+library(e1071)
+
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+
+set.seed(1)
+SVMwithoutcross <- svm(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                       data = process_train, 
+                       kernel = "polynomial", #Nonlinear data and it is polynomial relationships
+                       degree = 3)
+summary(SVMwithoutcross)
+
+pred_SVMwithoutcross <- predict(SVMwithoutcross, newdata = process_test)
+
+
+conmatrix_SVMwithoutcross <- table(pred_SVMwithoutcross, changedtpye_gender_submission$Survived)
+
+
+print(conmatrix_SVMwithoutcross)
+```
+
+```{r}
+TP_SVMwithoutcross <- sum(pred_SVMwithoutcross == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_SVMwithoutcross <- sum(pred_SVMwithoutcross == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_SVMwithoutcross <- sum(pred_SVMwithoutcross == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_SVMwithoutcross <- sum(pred_SVMwithoutcross == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic SVM:", TP_SVMwithoutcross, "\n")
+cat("True Negatives in Titanic SVM:", TN_SVMwithoutcross, "\n")
+cat("False Positives in Titanic SVM:", FP_SVMwithoutcross, "\n")
+cat("False Negatives in Titanic SVM:", FN_SVMwithoutcross, "\n")
+```
+
+```{r}
+table(pred_SVMwithoutcross, changedtpye_gender_submission$Survived)
+
+
+acc_SVMwithoutcross <- (TP_SVMwithoutcross + TN_SVMwithoutcross) / (TP_SVMwithoutcross + TN_SVMwithoutcross + FP_SVMwithoutcross + FN_SVMwithoutcross)
+
+precision_SVMwithoutcross <- (TP_SVMwithoutcross) / (TP_SVMwithoutcross + FP_SVMwithoutcross)
+
+reca_SVMwithoutcross <- (TP_SVMwithoutcross) / (TP_SVMwithoutcross + FN_SVMwithoutcross)
+
+f1_SVMwithoutcross <- 2 * ((precision_SVMwithoutcross * reca_SVMwithoutcross) / (precision_SVMwithoutcross + reca_SVMwithoutcross))
+
+cat("Accuracy of Titanic SVM:", acc_SVMwithoutcross, "\n")
+cat("Precision of Titanic SVM:", precision_SVMwithoutcross, "\n")
+cat("Recall of Titanic SVM:", reca_SVMwithoutcross, "\n")
+cat("F1-Score of Titanic SVM:", f1_SVMwithoutcross, "\n")
+```
+
+
+## SVM with k-fold cross-validation (k=10) - polynomial
+
+```{r}
+library(e1071)
+library(caret)
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+
+set.seed(1)
+k10 <- trainControl(method = "cv", number = 10)
+SVMk10 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                data = process_train, 
+                method = "svmPoly", #Nonlinear data and it is polynomial relationships
+                degree = 3, #default by svmPoly
+                trControl = k10)     #tuneLength = 10
+
+
+print(SVMk10)
+summary(SVMk10)
+
+pred_SVMk10 <- predict(SVMk10, newdata = process_test)
+
+conmatrix_SVMk10 <- table(pred_SVMk10, changedtpye_gender_submission$Survived)
+print(conmatrix_SVMk10)
+```
+
+```{r}
+TP_SVMk10 <- sum(pred_SVMk10 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_SVMk10 <- sum(pred_SVMk10 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_SVMk10 <- sum(pred_SVMk10 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_SVMk10 <- sum(pred_SVMk10 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic SVM:", TP_SVMk10, "\n")
+cat("True Negatives in Titanic SVM:", TN_SVMk10, "\n")
+cat("False Positives in Titanic SVM:", FP_SVMk10, "\n")
+cat("False Negatives in Titanic SVM:", FN_SVMk10, "\n")
+```
+
+```{r}
+table(pred_SVMk10, changedtpye_gender_submission$Survived)
+
+
+acc_SVMk10 <- (TP_SVMk10 + TN_SVMk10) / (TP_SVMk10 + TN_SVMk10 + FP_SVMk10 + FN_SVMk10)
+
+precision_SVMk10 <- (TP_SVMk10) / (TP_SVMk10 + FP_SVMk10)
+
+reca_SVMk10 <- (TP_SVMk10) / (TP_SVMk10 + FN_SVMk10)
+
+f1_SVMk10 <- 2 * ((precision_SVMk10 * reca_SVMk10) / (precision_SVMk10 + reca_SVMk10))
+
+cat("Accuracy of Titanic SVM:", acc_SVMk10, "\n")
+cat("Precision of Titanic SVM:", precision_SVMk10, "\n")
+cat("Recall of Titanic SVM:", reca_SVMk10, "\n")
+cat("F1-Score of Titanic SVM:", f1_SVMk10, "\n")
+```
+
+## SVM with k-fold cross-validation (k=5) - polynomial
+
+```{r}
+library(e1071)
+library(caret)
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+
+set.seed(1)
+k5 <- trainControl(method = "cv", number = 5)
+SVMk5 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                data = process_train, 
+                method = "svmPoly",#Nonlinear data and it is polynomial relationships
+                degree = 3, 
+                trControl = k5)     
+
+print(SVMk5)
+summary(SVMk5)
+
+pred_SVMk5 <- predict(SVMk5, newdata = process_test)
+
+conmatrix_SVMk5 <- table(pred_SVMk5, changedtpye_gender_submission$Survived)
+print(conmatrix_SVMk5)
+```
+
+```{r}
+TP_SVMk5 <- sum(pred_SVMk5 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_SVMk5 <- sum(pred_SVMk5 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_SVMk5 <- sum(pred_SVMk5 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_SVMk5 <- sum(pred_SVMk5 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic SVM:", TP_SVMk5, "\n")
+cat("True Negatives in Titanic SVM:", TN_SVMk5, "\n")
+cat("False Positives in Titanic SVM:", FP_SVMk5, "\n")
+cat("False Negatives in Titanic SVM:", FN_SVMk5, "\n")
+```
+
+```{r}
+table(pred_SVMk5, changedtpye_gender_submission$Survived)
+
+
+acc_SVMk5 <- (TP_SVMk5 + TN_SVMk5) / (TP_SVMk5 + TN_SVMk5 + FP_SVMk5 + FN_SVMk5)
+
+precision_SVMk5 <- (TP_SVMk5) / (TP_SVMk5 + FP_SVMk5)
+
+reca_SVMk5 <- (TP_SVMk5) / (TP_SVMk5 + FN_SVMk5)
+
+f1_SVMk5 <- 2 * ((precision_SVMk5 * reca_SVMk5) / (precision_SVMk5 + reca_SVMk5))
+
+cat("Accuracy of Titanic SVM", acc_SVMk5, "\n")
+cat("Precision of Titanic SVM:", precision_SVMk5, "\n")
+cat("Recall of Titanic SVM:", reca_SVMk5, "\n")
+cat("F1-Score of Titanic SVM:", f1_SVMk5, "\n")
+```
+
+## SVM with k-fold cross-validation (k=4) - polynomial
+
+```{r}
+library(e1071)
+library(caret)
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+
+set.seed(1)
+k4 <- trainControl(method = "cv", number = 4)
+SVMk4 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                data = process_train, 
+                method = "svmPoly", #Nonlinear data and it is polynomial relationships
+                degree = 3, 
+                trControl = k4)        
+
+print(SVMk4)
+summary(SVMk4)
+
+pred_SVMk4 <- predict(SVMk4, newdata = process_test)
+
+conmatrix_SVMk4 <- table(pred_SVMk4, changedtpye_gender_submission$Survived)
+print(conmatrix_SVMk4)
+```
+
+```{r}
+TP_SVMk4 <- sum(pred_SVMk4 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_SVMk4 <- sum(pred_SVMk4 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_SVMk4 <- sum(pred_SVMk4 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_SVMk4 <- sum(pred_SVMk4 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic SVM:", TP_SVMk4, "\n")
+cat("True Negatives in Titanic SVM:", TN_SVMk4, "\n")
+cat("False Positives in Titanic SVM:", FP_SVMk4, "\n")
+cat("False Negatives in Titanic SVM:", FN_SVMk4, "\n")
+```
+
+```{r}
+table(pred_SVMk4, changedtpye_gender_submission$Survived)
+
+
+acc_SVMk4 <- (TP_SVMk4 + TN_SVMk4) / (TP_SVMk4 + TN_SVMk4 + FP_SVMk4 + FN_SVMk4)
+
+precision_SVMk4 <- (TP_SVMk4) / (TP_SVMk4 + FP_SVMk4)
+
+reca_SVMk4 <- (TP_SVMk4) / (TP_SVMk4 + FN_SVMk4)
+
+f1_SVMk4 <- 2 * ((precision_SVMk4 * reca_SVMk4) / (precision_SVMk4 + reca_SVMk4))
+
+cat("Accuracy of Titanic SVM:", acc_SVMk4, "\n")
+cat("Precision of Titanic SVM:", precision_SVMk4, "\n")
+cat("Recall of Titanic SVM:", reca_SVMk4, "\n")
+cat("F1-Score of Titanic SVM:", f1_SVMk4, "\n")
+```
+
+
+
+# Naive Bayes(NB)
+## NB with out cross-validation 
+
+```{r}
+library(e1071)
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+set.seed(1)
+
+naibawithoutcross <- naiveBayes(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                             data = process_train)
+
+
+summary(naibawithoutcross)
+print(naibawithoutcross)
+
+
+pred_naibawithoutcross <- predict(naibawithoutcross, newdata = process_test)
+
+
+conmatrix_naibawithoutcross <- table(pred_naibawithoutcross, changedtpye_gender_submission$Survived)
+
+print(conmatrix_naibawithoutcross)
+```
+
+```{r}
+TP_naibawithoutcross <- sum(pred_naibawithoutcross == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_naibawithoutcross <- sum(pred_naibawithoutcross == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_naibawithoutcross <- sum(pred_naibawithoutcross == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_naibawithoutcross <- sum(pred_naibawithoutcross == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic NB:", TP_naibawithoutcross, "\n")
+cat("True Negatives in Titanic NB:", TN_naibawithoutcross, "\n")
+cat("False Positives in Titanic NB:", FP_naibawithoutcross, "\n")
+cat("False Negatives in Titanic NB:", FN_naibawithoutcross, "\n")
+```
+
+```{r}
+table(pred_naibawithoutcross, changedtpye_gender_submission$Survived)
+
+acc_naibawithoutcross <- (TP_naibawithoutcross + TN_naibawithoutcross) / (TP_naibawithoutcross + TN_naibawithoutcross + FP_naibawithoutcross + FN_naibawithoutcross)
+
+precision_naibawithoutcross <- (TP_naibawithoutcross) / (TP_naibawithoutcross + FP_naibawithoutcross)
+
+reca_naibawithoutcross <- (TP_naibawithoutcross) / (TP_naibawithoutcross + FN_naibawithoutcross)
+
+f1_naibawithoutcross <- 2 * ((precision_naibawithoutcross * reca_naibawithoutcross) / (precision_naibawithoutcross + reca_naibawithoutcross))
+
+cat("Accuracy of Titanic NB:", acc_naibawithoutcross, "\n")
+cat("Precision of Titanic NB:", precision_naibawithoutcross, "\n")
+cat("Recall of Titanic NB:", reca_naibawithoutcross, "\n")
+cat("F1-Score of Titanic NB:", f1_naibawithoutcross, "\n")
+```
+
+## NB with k-fold cross-validation (k=10)
+
+```{r}
+unique(process_train$Nickname)
+```
+
+```{r}
+unique(process_test$Nickname)
+```
+
+```{r}
+unique(changedtpye_gender_submission$Nickname)
+```
+
+
+```{r}
+library(caret)
+library(dplyr)
+library(forcats)
+
+
+origprocess_train <- process_train
+origprocess_test <- process_test
+
+#Groups all Nickname levels that appear fewer than 5 times into an (Other) category
+temprocess_train <- process_train %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5))
+
+temprocess_test <- process_test %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5)) %>%
+  mutate(Nickname = factor(Nickname, levels = levels(temprocess_train$Nickname)))
+
+set.seed(1)
+k10 <- trainControl(method = "cv", number = 10)
+
+naibak10 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                  data = temprocess_train, 
+                  method = "nb", 
+                  trControl = k10)
+
+summary(naibak10)
+print(naibak10)
+
+pred_naibak10 <- predict(naibak10, newdata = temprocess_test)
+
+conmatrix_naibak10 <- table(pred_naibak10, changedtpye_gender_submission$Survived)
+print(conmatrix_naibak10)
+
+process_train <- origprocess_train
+process_test <- origprocess_test
+```
+
+```{r}
+TP_naibak10 <- sum(pred_naibak10 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_naibak10 <- sum(pred_naibak10 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_naibak10 <- sum(pred_naibak10 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_naibak10 <- sum(pred_naibak10 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic NB:", TP_naibak10, "\n")
+cat("True Negatives in Titanic NB:", TN_naibak10, "\n")
+cat("False Positives in Titanic NB:", FP_naibak10, "\n")
+cat("False Negatives in Titanic NB:", FN_naibak10, "\n")
+```
+
+```{r}
+table(pred_naibak10, changedtpye_gender_submission$Survived)
+
+acc_naibak10 <- (TP_naibak10 + TN_naibak10) / (TP_naibak10 + TN_naibak10 + FP_naibak10 + FN_naibak10)
+
+precision_naibak10 <- (TP_naibak10) / (TP_naibak10 + FP_naibak10)
+
+reca_naibak10 <- (TP_naibak10) / (TP_naibak10 + FN_naibak10)
+
+f1_naibak10 <- 2 * ((precision_naibak10 * reca_naibak10) / (precision_naibak10 + reca_naibak10))
+
+cat("Accuracy of Titanic NB:", acc_naibak10, "\n")
+cat("Precision of Titanic NB:", precision_naibak10, "\n")
+cat("Recall of Titanic NB:", reca_naibak10, "\n")
+cat("F1-Score of Titanic NB:", f1_naibak10, "\n")
+```
+
+## NB with k-fold cross-validation (k=5)
+
+```{r}
+library(caret)
+library(dplyr)
+library(forcats)
+
+
+origprocess_train <- process_train
+origprocess_test <- process_test
+
+#Groups all Nickname levels that appear fewer than 5 times into an (Other) category
+temprocess_train <- process_train %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5))
+
+temprocess_test <- process_test %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5)) %>%
+  mutate(Nickname = factor(Nickname, levels = levels(temprocess_train$Nickname)))
+
+set.seed(1)
+k5 <- trainControl(method = "cv", number = 5)
+
+naibak5 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                  data = temprocess_train, 
+                  method = "nb", 
+                  trControl = k5)
+
+summary(naibak5)
+print(naibak5)
+
+pred_naibak5 <- predict(naibak5, newdata = temprocess_test)
+
+conmatrix_naibak5 <- table(pred_naibak5, changedtpye_gender_submission$Survived)
+print(conmatrix_naibak5)
+
+process_train <- origprocess_train
+process_test <- origprocess_test
+```
+
+```{r}
+TP_naibak5 <- sum(pred_naibak5 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_naibak5 <- sum(pred_naibak5 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_naibak5 <- sum(pred_naibak5 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_naibak5 <- sum(pred_naibak5 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic NB:", TP_naibak5, "\n")
+cat("True Negatives in Titanic NB:", TN_naibak5, "\n")
+cat("False Positives in Titanic NB:", FP_naibak5, "\n")
+cat("False Negatives in Titanic NB:", FN_naibak5, "\n")
+```
+
+```{r}
+table(pred_naibak5, changedtpye_gender_submission$Survived)
+
+acc_naibak5 <- (TP_naibak5 + TN_naibak5) / (TP_naibak5 + TN_naibak5 + FP_naibak5 + FN_naibak5)
+
+precision_naibak5 <- (TP_naibak5) / (TP_naibak5 + FP_naibak5)
+
+reca_naibak5 <- (TP_naibak5) / (TP_naibak5 + FN_naibak5)
+
+f1_naibak5 <- 2 * ((precision_naibak5 * reca_naibak5) / (precision_naibak5 + reca_naibak5))
+
+cat("Accuracy of Titanic NB:", acc_naibak5, "\n")
+cat("Precision of Titanic NB:", precision_naibak5, "\n")
+cat("Recall of Titanic NB:", reca_naibak5, "\n")
+cat("F1-Score of Titanic NB:", f1_naibak5, "\n")
+```
+
+## NB with k-fold cross-validation (k=4)
+
+```{r}
+library(caret)
+library(dplyr)
+library(forcats)
+
+
+origprocess_train <- process_train
+origprocess_test <- process_test
+
+#Groups all Nickname levels that appear fewer than 5 times into an (Other) category
+temprocess_train <- process_train %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5))
+
+temprocess_test <- process_test %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5)) %>%
+  mutate(Nickname = factor(Nickname, levels = levels(temprocess_train$Nickname)))
+
+set.seed(1)
+k4 <- trainControl(method = "cv", number = 4)
+
+naibak4 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                  data = temprocess_train, 
+                  method = "nb", 
+                  trControl = k4)
+
+summary(naibak4)
+print(naibak4)
+
+pred_naibak4 <- predict(naibak4, newdata = temprocess_test)
+
+conmatrix_naibak4 <- table(pred_naibak4, changedtpye_gender_submission$Survived)
+print(conmatrix_naibak4)
+
+process_train <- origprocess_train
+process_test <- origprocess_test
+```
+
+```{r}
+TP_naibak4 <- sum(pred_naibak4 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_naibak4 <- sum(pred_naibak4 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_naibak4 <- sum(pred_naibak4 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_naibak4 <- sum(pred_naibak4 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic NB:", TP_naibak4, "\n")
+cat("True Negatives in Titanic NB:", TN_naibak4, "\n")
+cat("False Positives in Titanic NB:", FP_naibak4, "\n")
+cat("False Negatives in Titanic NB:", FN_naibak4, "\n")
+```
+
+```{r}
+table(pred_naibak4, changedtpye_gender_submission$Survived)
+
+acc_naibak4 <- (TP_naibak4 + TN_naibak4) / (TP_naibak4 + TN_naibak4 + FP_naibak4 + FN_naibak4)
+
+precision_naibak4 <- (TP_naibak4) / (TP_naibak4 + FP_naibak4)
+
+reca_naibak4 <- (TP_naibak4) / (TP_naibak4 + FN_naibak4)
+
+f1_naibak4 <- 2 * ((precision_naibak4 * reca_naibak4) / (precision_naibak4 + reca_naibak4))
+
+cat("Accuracy of Titanic NB:", acc_naibak4, "\n")
+cat("Precision of Titanic NB:", precision_naibak4, "\n")
+cat("Recall of Titanic NB:", reca_naibak4, "\n")
+cat("F1-Score of Titanic NB:", f1_naibak4, "\n")
+```
+
+### The best performance of Naive Bayes is without cross validuation, and it is higher a lot then with cross validuation, it is the same with article. 
+### In my code when I use different number of K fold, Performance metrics will not change, it not the same with article, the article when k increase, Performance metrics increase a little bit.
+
+
+
+# Decision Tree (DT)
+## DT with out cross-validation 
+
+```{r}
+#install.packages("rpart")
+```
+
+
+```{r}
+library(rpart)
+library(caret)
+library(dplyr)
+library(forcats)
+
+origprocess_train <- process_train
+origprocess_test <- process_test
+
+# Group all Nickname levels that appear fewer than 5 times into an (Other) category
+temprocess_train <- process_train %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5))
+
+temprocess_test <- process_test %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5)) %>%
+  mutate(Nickname = factor(Nickname, levels = levels(temprocess_train$Nickname)))
+
+set.seed(1)
+
+
+treebestofdepth <- NULL
+treebestofaccuracy <- 0
+
+# try different depth of the tree
+for(depth in c(5, 10, 20, 25, 30)) {
+  set.seed(1)
+  
+  dectrwithoutcross <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname,
+                             data = temprocess_train,
+                             control = rpart.control(maxdepth = depth))
+
+  print(paste("DT summary of max depth:", depth))
+  summary(dectrwithoutcross)
+  print(dectrwithoutcross)
+
+  pred_dectrwithoutcross <- predict(dectrwithoutcross, newdata = temprocess_test, type = "class")
+
+  conmatrix_dectrwithoutcross <- table(pred_dectrwithoutcross, changedtpye_gender_submission$Survived)
+  print(conmatrix_dectrwithoutcross)
+
+  accuracy <- sum(diag(conmatrix_dectrwithoutcross)) / sum(conmatrix_dectrwithoutcross)
+
+  if(accuracy > treebestofaccuracy) {
+    treebestofaccuracy <- accuracy
+    treebestofdepth <- depth
+  }
+}
+print(paste("Best Max Depth:", treebestofdepth, "with accuracy:", round(treebestofaccuracy * 100, 4), "%"))
+process_train <- origprocess_train
+process_test <- origprocess_test
+```
+
+```{r}
+TP_dectrwithoutcross <- sum(pred_dectrwithoutcross == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_dectrwithoutcross <- sum(pred_dectrwithoutcross == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_dectrwithoutcross <- sum(pred_dectrwithoutcross == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_dectrwithoutcross <- sum(pred_dectrwithoutcross == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic DT:", TP_dectrwithoutcross, "\n")
+cat("True Negatives in Titanic DT:", TN_dectrwithoutcross, "\n")
+cat("False Positives in Titanic DT:", FP_dectrwithoutcross, "\n")
+cat("False Negatives in Titanic DT:", FN_dectrwithoutcross, "\n")
+```
+
+```{r}
+# Check lengths
+length(pred_dectrwithoutcross)
+length(changedtpye_gender_submission$Survived)
+```
+
+```{r}
+table(pred_dectrwithoutcross, changedtpye_gender_submission$Survived)
+
+acc_dectrwithoutcross <- (TP_dectrwithoutcross + TN_dectrwithoutcross) / (TP_dectrwithoutcross + TN_dectrwithoutcross + FP_dectrwithoutcross + FN_dectrwithoutcross)
+
+precision_dectrwithoutcross <- (TP_dectrwithoutcross) / (TP_dectrwithoutcross + FP_dectrwithoutcross)
+
+reca_dectrwithoutcross <- (TP_dectrwithoutcross) / (TP_dectrwithoutcross + FN_dectrwithoutcross)
+
+f1_dectrwithoutcross <- 2 * ((precision_dectrwithoutcross * reca_dectrwithoutcross) / (precision_dectrwithoutcross + reca_dectrwithoutcross))
+
+cat("Accuracy of Titanic DT:", acc_dectrwithoutcross, "\n")
+cat("Precision of Titanic DT:", precision_dectrwithoutcross, "\n")
+cat("Recall of Titanic DT:", reca_dectrwithoutcross, "\n")
+cat("F1-Score of Titanic DT:", f1_dectrwithoutcross, "\n")
+```
+
+## DT with k-fold cross-validation (k=10)
+
+```{r}
+library(rpart)
+library(caret)
+library(dplyr)
+library(forcats)
+
+origprocess_train <- process_train
+origprocess_test <- process_test
+
+# Group all Nickname levels that appear fewer than 5 times into an (Other) category
+temprocess_train <- process_train %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5))
+
+temprocess_test <- process_test %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5)) %>%
+  mutate(Nickname = factor(Nickname, levels = levels(temprocess_train$Nickname)))
+
+set.seed(1)
+
+
+treebestofdepth <- NULL
+treebestofaccuracy <- 0
+
+k10 <- trainControl(method = "cv", number = 10)
+
+# try different depth of the tree
+sampledepth <- expand.grid(maxdepth = c(5, 10, 20, 25, 30))
+
+dectrk10 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname,
+                  data = temprocess_train,
+                  method = "rpart2",  
+                  tuneGrid = sampledepth,
+                  trControl = k10)
+
+print(paste("DT summary of max depth:", depth))
+summary(dectrk10)
+print(dectrk10)
+
+
+pred_dectrk10 <- predict(dectrk10, newdata = temprocess_test)
+
+conmatrix_dectrk10 <- table(pred_dectrk10, changedtpye_gender_submission$Survived)
+print(conmatrix_dectrk10)
+
+
+treebestmodel <- dectrk10$bestTune
+
+
+accuracy <- sum(diag(conmatrix_dectrk10)) / sum(conmatrix_dectrk10)
+
+print(paste("Best Max Depth:", treebestmodel$maxdepth, "with accuracy:", round(accuracy * 100, 4), "%"))
+
+process_train <- origprocess_train
+process_test <- origprocess_test
+```
+
+```{r}
+TP_dectrk10 <- sum(pred_dectrk10 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_dectrk10 <- sum(pred_dectrk10 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_dectrk10 <- sum(pred_dectrk10 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_dectrk10 <- sum(pred_dectrk10 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic DT:", TP_dectrk10, "\n")
+cat("True Negatives in Titanic DT:", TN_dectrk10, "\n")
+cat("False Positives in Titanic DT:", FP_dectrk10, "\n")
+cat("False Negatives in Titanic DT:", FN_dectrk10, "\n")
+```
+
+```{r}
+table(pred_dectrk10, changedtpye_gender_submission$Survived)
+
+acc_dectrk10 <- (TP_dectrk10 + TN_dectrk10) / (TP_dectrk10 + TN_dectrk10 + FP_dectrk10 + FN_dectrk10)
+
+precision_dectrk10 <- (TP_dectrk10) / (TP_dectrk10 + FP_dectrk10)
+
+reca_dectrk10 <- (TP_dectrk10) / (TP_dectrk10 + FN_dectrk10)
+
+f1_dectrk10 <- 2 * ((precision_dectrk10 * reca_dectrk10) / (precision_dectrk10 + reca_dectrk10))
+
+cat("Accuracy of Titanic DT:", acc_dectrk10, "\n")
+cat("Precision of Titanic DT:", precision_dectrk10, "\n")
+cat("Recall of Titanic DT:", reca_dectrk10, "\n")
+cat("F1-Score of Titanic DT:", f1_dectrk10, "\n")
+```
+
+
+
+## DT with k-fold cross-validation (k=5)
+
+```{r}
+library(rpart)
+library(caret)
+library(dplyr)
+library(forcats)
+
+origprocess_train <- process_train
+origprocess_test <- process_test
+
+# Group all Nickname levels that appear fewer than 5 times into an (Other) category
+temprocess_train <- process_train %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5))
+
+temprocess_test <- process_test %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5)) %>%
+  mutate(Nickname = factor(Nickname, levels = levels(temprocess_train$Nickname)))
+
+set.seed(1)
+
+
+treebestofdepth <- NULL
+treebestofaccuracy <- 0
+
+k5 <- trainControl(method = "cv", number = 5)
+
+# try different depth of the tree
+sampledepth <- expand.grid(maxdepth = c(5, 10, 20, 25, 30))
+
+dectrk5 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname,
+                  data = temprocess_train,
+                  method = "rpart2",  
+                  tuneGrid = sampledepth,
+                  trControl = k5)
+
+print(paste("DT summary of max depth:", depth))
+summary(dectrk5)
+print(dectrk5)
+
+
+pred_dectrk5 <- predict(dectrk5, newdata = temprocess_test)
+
+conmatrix_dectrk5 <- table(pred_dectrk5, changedtpye_gender_submission$Survived)
+print(conmatrix_dectrk5)
+
+
+treebestmodel <- dectrk5$bestTune
+
+
+accuracy <- sum(diag(conmatrix_dectrk5)) / sum(conmatrix_dectrk5)
+
+print(paste("Best Max Depth:", treebestmodel$maxdepth, "with accuracy:", round(accuracy * 100, 4), "%"))
+
+process_train <- origprocess_train
+process_test <- origprocess_test
+```
+
+```{r}
+TP_dectrk5 <- sum(pred_dectrk5 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_dectrk5 <- sum(pred_dectrk5 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_dectrk5 <- sum(pred_dectrk5 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_dectrk5 <- sum(pred_dectrk5 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic DT:", TP_dectrk5, "\n")
+cat("True Negatives in Titanic DT:", TN_dectrk5, "\n")
+cat("False Positives in Titanic DT:", FP_dectrk5, "\n")
+cat("False Negatives in Titanic DT:", FN_dectrk5, "\n")
+```
+
+```{r}
+table(pred_dectrk5, changedtpye_gender_submission$Survived)
+
+acc_dectrk5 <- (TP_dectrk5 + TN_dectrk5) / (TP_dectrk5 + TN_dectrk5 + FP_dectrk5 + FN_dectrk5)
+
+precision_dectrk5 <- (TP_dectrk5) / (TP_dectrk5 + FP_dectrk5)
+
+reca_dectrk5 <- (TP_dectrk5) / (TP_dectrk5 + FN_dectrk5)
+
+f1_dectrk5 <- 2 * ((precision_dectrk5 * reca_dectrk5) / (precision_dectrk5 + reca_dectrk5))
+
+cat("Accuracy of Titanic DT:", acc_dectrk5, "\n")
+cat("Precision of Titanic DT:", precision_dectrk5, "\n")
+cat("Recall of Titanic DT:", reca_dectrk5, "\n")
+cat("F1-Score of Titanic DT:", f1_dectrk5, "\n")
+```
+
+
+
+## DT with k-fold cross-validation (k=4)
+
+```{r}
+library(rpart)
+library(caret)
+library(dplyr)
+library(forcats)
+
+origprocess_train <- process_train
+origprocess_test <- process_test
+
+# Group all Nickname levels that appear fewer than 5 times into an (Other) category
+temprocess_train <- process_train %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5))
+
+temprocess_test <- process_test %>%
+  mutate(Nickname = fct_lump_min(Nickname, min = 5)) %>%
+  mutate(Nickname = factor(Nickname, levels = levels(temprocess_train$Nickname)))
+
+set.seed(1)
+
+
+treebestofdepth <- NULL
+treebestofaccuracy <- 0
+
+k4 <- trainControl(method = "cv", number = 4)
+
+# try different depth of the tree
+sampledepth <- expand.grid(maxdepth = c(5, 10, 20, 25, 30))
+
+dectrk4 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname,
+                  data = temprocess_train,
+                  method = "rpart2",  
+                  tuneGrid = sampledepth,
+                  trControl = k4)
+
+print(paste("DT summary of max depth:", depth))
+summary(dectrk4)
+print(dectrk4)
+
+
+pred_dectrk4 <- predict(dectrk4, newdata = temprocess_test)
+
+conmatrix_dectrk4 <- table(pred_dectrk4, changedtpye_gender_submission$Survived)
+print(conmatrix_dectrk4)
+
+
+treebestmodel <- dectrk4$bestTune
+
+
+accuracy <- sum(diag(conmatrix_dectrk4)) / sum(conmatrix_dectrk4)
+
+print(paste("Best Max Depth:", treebestmodel$maxdepth, "with accuracy:", round(accuracy * 100, 4), "%"))
+
+process_train <- origprocess_train
+process_test <- origprocess_test
+```
+
+```{r}
+TP_dectrk4 <- sum(pred_dectrk4 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_dectrk4 <- sum(pred_dectrk4 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_dectrk4 <- sum(pred_dectrk4 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_dectrk4 <- sum(pred_dectrk4 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic DT:", TP_dectrk4, "\n")
+cat("True Negatives in Titanic DT:", TN_dectrk4, "\n")
+cat("False Positives in Titanic DT:", FP_dectrk4, "\n")
+cat("False Negatives in Titanic DT:", FN_dectrk4, "\n")
+```
+
+```{r}
+table(pred_dectrk4, changedtpye_gender_submission$Survived)
+
+acc_dectrk4 <- (TP_dectrk4 + TN_dectrk4) / (TP_dectrk4 + TN_dectrk4 + FP_dectrk4 + FN_dectrk4)
+
+precision_dectrk4 <- (TP_dectrk4) / (TP_dectrk4 + FP_dectrk4)
+
+reca_dectrk4 <- (TP_dectrk4) / (TP_dectrk4 + FN_dectrk4)
+
+f1_dectrk4 <- 2 * ((precision_dectrk4 * reca_dectrk4) / (precision_dectrk4 + reca_dectrk4))
+
+cat("Accuracy of Titanic DT:", acc_dectrk4, "\n")
+cat("Precision of Titanic DT:", precision_dectrk4, "\n")
+cat("Recall of Titanic DT:", reca_dectrk4, "\n")
+cat("F1-Score of Titanic DT:", f1_dectrk4, "\n")
+```
+
+
+
+# Random Forest(RF)
+## RF with out cross-validation 
+
+```{r}
+library(randomForest)
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+set.seed(1)
+
+# find the best tree
+samplenumtree <- c(10, 100, 250, 500, 1000)
+samplemaxnodes <- c(10, 20, 30, 50, 100)
+
+setbestnumtree <- 0
+setbestmaxnodes <- 0
+setbestaccuracy <- 0
+
+for (ntree in samplenumtree) {
+  for (maxnodes in samplemaxnodes) {
+    ranfomodel <- randomForest(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                             data = process_train, 
+                             ntree = ntree,
+                             maxnodes = maxnodes)
+  
+  pred_ranfomodel <- predict(ranfomodel, newdata = process_test)
+  
+  conmatrix <- table(pred_ranfomodel, changedtpye_gender_submission$Survived)
+  
+  accuracy_nonbest_ranfo <- sum(diag(conmatrix)) / sum(conmatrix)
+  
+  print(paste("Number of tree =", ntree, "num Max nodes =", maxnodes, "num Accuracy =", accuracy_nonbest_ranfo))
+  
+    if (accuracy_nonbest_ranfo > setbestaccuracy) {
+      setbestaccuracy <- accuracy_nonbest_ranfo
+      setbestnumtree <- ntree
+      setbestmaxnodes <- maxnodes
+    }
+  }
+}
+
+print(paste("Best number tree in random forest model =", setbestnumtree, 
+            "and the best max nodes =", setbestmaxnodes, 
+            "with the best accuracy =", setbestaccuracy))
+
+# use best n tree to do model
+ranfowithoutcross <- randomForest(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                                data = process_train, 
+                                ntree = setbestnumtree, 
+                                maxnodes = setbestmaxnodes)
+
+pred_ranfowithoutcross <- predict(ranfowithoutcross, newdata = process_test)
+
+conmatrix_ranfowithoutcross <- table(pred_ranfowithoutcross, changedtpye_gender_submission$Survived)
+
+print(conmatrix_ranfowithoutcross)
+```
+
+
+```{r}
+summary(ranfomodel)
+print(ranfomodel)
+```
+
+```{r}
+summary(ranfowithoutcross)
+print(ranfowithoutcross)
+```
+
+
+```{r}
+TP_ranfowithoutcross <- sum(pred_ranfowithoutcross == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_ranfowithoutcross <- sum(pred_ranfowithoutcross == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_ranfowithoutcross <- sum(pred_ranfowithoutcross == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_ranfowithoutcross <- sum(pred_ranfowithoutcross == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic RF:", TP_ranfowithoutcross, "\n")
+cat("True Negatives in Titanic RF:", TN_ranfowithoutcross, "\n")
+cat("False Positives in Titanic RF:", FP_ranfowithoutcross, "\n")
+cat("False Negatives in Titanic RF:", FN_ranfowithoutcross, "\n")
+```
+
+```{r}
+table(pred_ranfowithoutcross, changedtpye_gender_submission$Survived)
+
+acc_ranfowithoutcross <- (TP_ranfowithoutcross + TN_ranfowithoutcross) / (TP_ranfowithoutcross + TN_ranfowithoutcross + FP_ranfowithoutcross + FN_ranfowithoutcross)
+
+precision_ranfowithoutcross <- (TP_ranfowithoutcross) / (TP_ranfowithoutcross + FP_ranfowithoutcross)
+
+reca_ranfowithoutcross <- (TP_ranfowithoutcross) / (TP_ranfowithoutcross + FN_ranfowithoutcross)
+
+f1_ranfowithoutcross <- 2 * ((precision_ranfowithoutcross * reca_ranfowithoutcross) / (precision_ranfowithoutcross + reca_ranfowithoutcross))
+
+cat("Accuracy of Titanic RF:", acc_ranfowithoutcross, "\n")
+cat("Precision of Titanic RF:", precision_ranfowithoutcross, "\n")
+cat("Recall of Titanic RF:", reca_ranfowithoutcross, "\n")
+cat("F1-Score of Titanic RF:", f1_ranfowithoutcross, "\n")
+```
+
+
+
+## RF with k-fold cross-validation (k=10)
+
+```{r}
+library(randomForest)
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+set.seed(1)
+
+k10 <- trainControl(method = "cv", number = 10)
+
+#ranging from 1 to the number of predictors minus one
+creatgrid <- expand.grid(mtry = 1:(ncol(process_train) - 1))  
+
+# find the best tree
+samplenumtree <- c(10, 100, 250, 500, 1000)
+samplemaxnodes <- c(10, 20, 30, 50, 100)
+
+setbestnumtree <- 0
+setbestmaxnodes <- 0
+setbestaccuracy <- 0
+
+for (ntree in samplenumtree) {
+  for (maxnodes in samplemaxnodes) {
+    ranfomodel <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                    data = process_train,
+                    method = "rf",
+                    tuneGrid = creatgrid, 
+                    trControl = k10,       
+                    ntree = ntree,         
+                    maxnodes = maxnodes)
+  
+  pred_ranfomodel <- predict(ranfomodel, newdata = process_test)
+  
+  conmatrix <- table(pred_ranfomodel, changedtpye_gender_submission$Survived)
+  
+  accuracy_nonbest_ranfo <- sum(diag(conmatrix)) / sum(conmatrix)
+  
+  print(paste("Number of tree =", ntree, "num Max nodes =", maxnodes, "num Accuracy =", accuracy_nonbest_ranfo))
+  
+    if (accuracy_nonbest_ranfo > setbestaccuracy) {
+      setbestaccuracy <- accuracy_nonbest_ranfo
+      setbestnumtree <- ntree
+      setbestmaxnodes <- maxnodes
+    }
+  }
+}
+
+print(paste("Best number tree in random forest model =", setbestnumtree, 
+            "and the best max nodes =", setbestmaxnodes, 
+            "with the best accuracy =", setbestaccuracy))
+
+# use best n tree to do model
+k10 <- trainControl(method = "cv", number = 10)
+ranfok10 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                                data = process_train,
+                                method = "rf",
+                                tuneGrid = creatgrid,
+                                trControl = k10,
+                                ntree = setbestnumtree, 
+                                maxnodes = setbestmaxnodes
+                                )
+
+pred_ranfok10 <- predict(ranfok10, newdata = process_test)
+
+conmatrix_ranfok10 <- table(pred_ranfok10, changedtpye_gender_submission$Survived)
+
+print(conmatrix_ranfok10)
+```
+
+```{r}
+summary(ranfomodel)
+print(ranfomodel)
+```
+
+```{r}
+summary(ranfok10)
+print(ranfok10)
+```
+
+```{r}
+TP_ranfok10 <- sum(pred_ranfok10 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_ranfok10 <- sum(pred_ranfok10 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_ranfok10 <- sum(pred_ranfok10 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_ranfok10 <- sum(pred_ranfok10 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic RF:", TP_ranfok10, "\n")
+cat("True Negatives in Titanic RF:", TN_ranfok10, "\n")
+cat("False Positives in Titanic RF:", FP_ranfok10, "\n")
+cat("False Negatives in Titanic RF:", FN_ranfok10, "\n")
+```
+
+```{r}
+table(pred_ranfok10, changedtpye_gender_submission$Survived)
+
+acc_ranfok10 <- (TP_ranfok10 + TN_ranfok10) / (TP_ranfok10 + TN_ranfok10 + FP_ranfok10 + FN_ranfok10)
+
+precision_ranfok10 <- (TP_ranfok10) / (TP_ranfok10 + FP_ranfok10)
+
+reca_ranfok10 <- (TP_ranfok10) / (TP_ranfok10 + FN_ranfok10)
+
+f1_ranfok10 <- 2 * ((precision_ranfok10 * reca_ranfok10) / (precision_ranfok10 + reca_ranfok10))
+
+cat("Accuracy of Titanic RF:", acc_ranfok10, "\n")
+cat("Precision of Titanic RF:", precision_ranfok10, "\n")
+cat("Recall of Titanic RF:", reca_ranfok10, "\n")
+cat("F1-Score of Titanic RF:", f1_ranfok10, "\n")
+```
+
+
+
+## RF with k-fold cross-validation (k=5)
+
+```{r}
+library(randomForest)
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+set.seed(1)
+
+k5 <- trainControl(method = "cv", number = 5)
+
+#ranging from 1 to the number of predictors minus one
+creatgrid <- expand.grid(mtry = 1:(ncol(process_train) - 1))  
+
+# find the best tree
+samplenumtree <- c(10, 100, 250, 500, 1000)
+samplemaxnodes <- c(10, 20, 30, 50, 100)
+
+setbestnumtree <- 0
+setbestmaxnodes <- 0
+setbestaccuracy <- 0
+
+for (ntree in samplenumtree) {
+  for (maxnodes in samplemaxnodes) {
+    ranfomodel <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                    data = process_train,
+                    method = "rf",
+                    tuneGrid = creatgrid, 
+                    trControl = k5,       
+                    ntree = ntree,         
+                    maxnodes = maxnodes)
+  
+  pred_ranfomodel <- predict(ranfomodel, newdata = process_test)
+  
+  conmatrix <- table(pred_ranfomodel, changedtpye_gender_submission$Survived)
+  
+  accuracy_nonbest_ranfo <- sum(diag(conmatrix)) / sum(conmatrix)
+  
+  print(paste("Number of tree =", ntree, "num Max nodes =", maxnodes, "num Accuracy =", accuracy_nonbest_ranfo))
+  
+    if (accuracy_nonbest_ranfo > setbestaccuracy) {
+      setbestaccuracy <- accuracy_nonbest_ranfo
+      setbestnumtree <- ntree
+      setbestmaxnodes <- maxnodes
+    }
+  }
+}
+
+print(paste("Best number tree in random forest model =", setbestnumtree, 
+            "and the best max nodes =", setbestmaxnodes, 
+            "with the best accuracy =", setbestaccuracy))
+
+# use best n tree to do model
+k5 <- trainControl(method = "cv", number = 5)
+ranfok5 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                                data = process_train,
+                                method = "rf",
+                                tuneGrid = creatgrid,
+                                trControl = k5,
+                                ntree = setbestnumtree, 
+                                maxnodes = setbestmaxnodes
+                                )
+
+pred_ranfok5 <- predict(ranfok5, newdata = process_test)
+
+conmatrix_ranfok5 <- table(pred_ranfok5, changedtpye_gender_submission$Survived)
+
+print(conmatrix_ranfok5)
+```
+
+```{r}
+summary(ranfomodel)
+print(ranfomodel)
+```
+
+```{r}
+summary(ranfok5)
+print(ranfok5)
+```
+
+```{r}
+TP_ranfok5 <- sum(pred_ranfok5 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_ranfok5 <- sum(pred_ranfok5 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_ranfok5 <- sum(pred_ranfok5 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_ranfok5 <- sum(pred_ranfok5 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic RF:", TP_ranfok5, "\n")
+cat("True Negatives in Titanic RF:", TN_ranfok5, "\n")
+cat("False Positives in Titanic RF:", FP_ranfok5, "\n")
+cat("False Negatives in Titanic RF:", FN_ranfok5, "\n")
+```
+
+```{r}
+table(pred_ranfok5, changedtpye_gender_submission$Survived)
+
+acc_ranfok5 <- (TP_ranfok5 + TN_ranfok5) / (TP_ranfok5 + TN_ranfok5 + FP_ranfok5 + FN_ranfok5)
+
+precision_ranfok5 <- (TP_ranfok5) / (TP_ranfok5 + FP_ranfok5)
+
+reca_ranfok5 <- (TP_ranfok5) / (TP_ranfok5 + FN_ranfok5)
+
+f1_ranfok5 <- 2 * ((precision_ranfok5 * reca_ranfok5) / (precision_ranfok5 + reca_ranfok5))
+
+cat("Accuracy of Titanic RF:", acc_ranfok5, "\n")
+cat("Precision of Titanic RF:", precision_ranfok5, "\n")
+cat("Recall of Titanic RF:", reca_ranfok5, "\n")
+cat("F1-Score of Titanic RF:", f1_ranfok5, "\n")
+```
+
+
+
+## RF with k-fold cross-validation (k=4)
+
+```{r}
+library(randomForest)
+
+process_test$Sex <- factor(process_test$Sex, levels = levels(process_train$Sex))
+process_test$Nickname <- factor(process_test$Nickname, levels = levels(process_train$Nickname))
+
+set.seed(1)
+
+k4 <- trainControl(method = "cv", number = 4)
+
+#ranging from 1 to the number of predictors minus one
+creatgrid <- expand.grid(mtry = 1:(ncol(process_train) - 1))  
+
+# find the best tree
+samplenumtree <- c(10, 100, 250, 500, 1000)
+samplemaxnodes <- c(10, 20, 30, 50, 100)
+
+setbestnumtree <- 0
+setbestmaxnodes <- 0
+setbestaccuracy <- 0
+
+for (ntree in samplenumtree) {
+  for (maxnodes in samplemaxnodes) {
+    ranfomodel <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                    data = process_train,
+                    method = "rf",
+                    tuneGrid = creatgrid, 
+                    trControl = k4,       
+                    ntree = ntree,         
+                    maxnodes = maxnodes)
+  
+  pred_ranfomodel <- predict(ranfomodel, newdata = process_test)
+  
+  conmatrix <- table(pred_ranfomodel, changedtpye_gender_submission$Survived)
+  
+  accuracy_nonbest_ranfo <- sum(diag(conmatrix)) / sum(conmatrix)
+  
+  print(paste("Number of tree =", ntree, "num Max nodes =", maxnodes, "num Accuracy =", accuracy_nonbest_ranfo))
+  
+    if (accuracy_nonbest_ranfo > setbestaccuracy) {
+      setbestaccuracy <- accuracy_nonbest_ranfo
+      setbestnumtree <- ntree
+      setbestmaxnodes <- maxnodes
+    }
+  }
+}
+
+print(paste("Best number tree in random forest model =", setbestnumtree, 
+            "and the best max nodes =", setbestmaxnodes, 
+            "with the best accuracy =", setbestaccuracy))
+
+# use best n tree to do model
+k4 <- trainControl(method = "cv", number = 4)
+ranfok4 <- train(Survived ~ Pclass + Sex + Age + SibSp + Parch + Nickname, 
+                                data = process_train,
+                                method = "rf",
+                                tuneGrid = creatgrid,
+                                trControl = k4,
+                                ntree = setbestnumtree, 
+                                maxnodes = setbestmaxnodes
+                                )
+
+pred_ranfok4 <- predict(ranfok4, newdata = process_test)
+
+conmatrix_ranfok4 <- table(pred_ranfok4, changedtpye_gender_submission$Survived)
+
+print(conmatrix_ranfok4)
+```
+
+```{r}
+summary(ranfomodel)
+print(ranfomodel)
+```
+
+```{r}
+summary(ranfok4)
+print(ranfok4)
+```
+
+```{r}
+TP_ranfok4 <- sum(pred_ranfok4 == 1 & changedtpye_gender_submission$Survived == 1)
+
+TN_ranfok4 <- sum(pred_ranfok4 == 0 & changedtpye_gender_submission$Survived == 0)
+
+FP_ranfok4 <- sum(pred_ranfok4 == 1 & changedtpye_gender_submission$Survived == 0)
+
+FN_ranfok4 <- sum(pred_ranfok4 == 0 & changedtpye_gender_submission$Survived == 1)
+
+cat("True Positives in Titanic RF:", TP_ranfok4, "\n")
+cat("True Negatives in Titanic RF:", TN_ranfok4, "\n")
+cat("False Positives in Titanic RF:", FP_ranfok4, "\n")
+cat("False Negatives in Titanic RF:", FN_ranfok4, "\n")
+```
+
+```{r}
+table(pred_ranfok4, changedtpye_gender_submission$Survived)
+
+acc_ranfok4 <- (TP_ranfok4 + TN_ranfok4) / (TP_ranfok4 + TN_ranfok4 + FP_ranfok4 + FN_ranfok4)
+
+precision_ranfok4 <- (TP_ranfok4) / (TP_ranfok4 + FP_ranfok4)
+
+reca_ranfok4 <- (TP_ranfok4) / (TP_ranfok4 + FN_ranfok4)
+
+f1_ranfok4 <- 2 * ((precision_ranfok4 * reca_ranfok4) / (precision_ranfok4 + reca_ranfok4))
+
+cat("Accuracy of Titanic RF:", acc_ranfok4, "\n")
+cat("Precision of Titanic RF:", precision_ranfok4, "\n")
+cat("Recall of Titanic RF:", reca_ranfok4, "\n")
+cat("F1-Score of Titanic RF:", f1_ranfok4, "\n")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
